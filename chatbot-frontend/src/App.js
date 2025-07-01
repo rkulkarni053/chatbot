@@ -1,21 +1,31 @@
+// Frontend: App.js
 import React, { useState } from "react";
 import "./App.css";
 import FloatingAssistant from "./components/FloatingAssistant";
 
+const onboardingChecklist = [
+  {
+    question: "Please download, sign, and upload the onboarding acknowledgment.",
+    type: "upload",
+    url:
+      "https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EVVruOiHIeRPoJcnnFT-IlMBh57Swffmj-dOZfDfLfIh7A?e=ibsznb",
+  },
+  { question: "Complete the onboarding survey.", type: "text" },
+  { question: "Set up your work account.", type: "text" },
+];
+
+const offboardingChecklist = [
+  {
+    question: "Please download, sign, and upload the offboarding acknowledgment.",
+    type: "upload",
+    url:
+      "https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EQx2WeMLGgFMrN5-3v1LiKwBI4P7e78ig8Wwi11YIGEbMA?e=FYsrgv",
+  },
+  { question: "Return company equipment.", type: "text" },
+  { question: "Complete the exit interview survey.", type: "text" },
+];
+
 const App = () => {
-  // Checklists
-  const onboardingChecklist = [
-    "Please download, sign, and upload the onboarding acknowledgment.",
-    "Complete the onboarding survey.",
-    "Set up your work account.",
-  ];
-
-  const offboardingChecklist = [
-    "Please download, sign, and upload the offboarding acknowledgment.",
-    "Return company equipment.",
-    "Complete the exit interview survey.",
-  ];
-
   const [messages, setMessages] = useState([
     { sender: "bot", text: "Good morning! What is your name?" },
   ]);
@@ -30,6 +40,35 @@ const App = () => {
   const triggerAssistant = () => {
     setAssistantActive(true);
     setTimeout(() => setAssistantActive(false), 800);
+  };
+
+  const saveResponsesToDB = async () => {
+    const formData = new FormData();
+
+    const formattedResponses = currentChecklist.slice(0, currentQuestionIndex + 1).map((item) => ({
+      question: item.question,
+      response: item.type === "upload" ? uploadedFile?.name || "N/A" : "completed",
+    }));
+
+    formData.append(
+      "process",
+      currentChecklist === onboardingChecklist ? "onboarding" : "offboarding"
+    );
+    formData.append("responses", JSON.stringify(formattedResponses));
+    if (uploadedFile) formData.append("file", uploadedFile);
+
+    try {
+      const res = await fetch("http://localhost:5000/responses", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to save responses");
+      const result = await res.json();
+      console.log("✅ Saved:", result);
+      setTimeout(() => window.location.reload(), 3000);
+    } catch (err) {
+      console.error("❌ Error saving:", err);
+    }
   };
 
   const handleSendMessage = () => {
@@ -51,18 +90,17 @@ const App = () => {
       setCurrentStep("chooseProcess");
       triggerAssistant();
     } else if (currentStep === "askChecklist") {
-      const currentQuestion = currentChecklist[currentQuestionIndex];
-      if (currentQuestion.includes("upload")) {
+      const currentItem = currentChecklist[currentQuestionIndex];
+      if (currentItem.type === "upload") {
         setMessages((prev) => [
           ...prev,
           { sender: "bot", text: "Please upload the signed acknowledgment below." },
         ]);
         setCurrentStep("uploadFile");
-        triggerAssistant();
       } else {
         if (currentQuestionIndex < currentChecklist.length - 1) {
           const next = currentChecklist[currentQuestionIndex + 1];
-          setMessages((prev) => [...prev, { sender: "bot", text: next }]);
+          setMessages((prev) => [...prev, { sender: "bot", text: next.question }]);
           setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
           setMessages((prev) => [
@@ -70,6 +108,7 @@ const App = () => {
             { sender: "bot", text: "Thank you for completing the process!" },
           ]);
           setCurrentStep("completed");
+          saveResponsesToDB();
         }
         triggerAssistant();
       }
@@ -79,37 +118,22 @@ const App = () => {
   };
 
   const handleProcessChoice = (type) => {
-    let checklist, link, label;
-    if (type === "onboarding") {
-      checklist = onboardingChecklist;
-      link =
-        "https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EVVruOiHIeRPoJcnnFT-IlMBh57Swffmj-dOZfDfLfIh7A?e=ibsznb";
-      label = "Onboarding";
-    } else {
-      checklist = offboardingChecklist;
-      link =
-        "https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EQx2WeMLGgFMrN5-3v1LiKwBI4P7e78ig8Wwi11YIGEbMA?e=FYsrgv";
-      label = "Offboarding";
-    }
-
+    const checklist = type === "onboarding" ? onboardingChecklist : offboardingChecklist;
     setCurrentChecklist(checklist);
+    const label = type.charAt(0).toUpperCase() + type.slice(1);
+
     setMessages((prev) => [
       ...prev,
-      { sender: "bot", text: `Great! Let's start the ${label.toLowerCase()} process.` },
+      { sender: "bot", text: `Great! Let's start the ${type} process.` },
       {
         sender: "bot",
         text: (
-          <a
-            href={link}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          <a href={checklist[0].url} download target="_blank" rel="noopener noreferrer">
             Download {label} Acknowledgment
           </a>
         ),
       },
-      { sender: "bot", text: checklist[0] },
+      { sender: "bot", text: checklist[0].question },
     ]);
     setCurrentStep("askChecklist");
     triggerAssistant();
@@ -119,27 +143,24 @@ const App = () => {
     const file = event.target.files[0];
     setUploadedFile(file);
 
-    // Add a message confirming the file upload
     setMessages((prev) => [
       ...prev,
-      { sender: "bot", text: `File "${file.name}" uploaded successfully.` },
+      { sender: "bot", text: `File \"${file.name}\" uploaded successfully.` },
     ]);
 
-    // Check if there are more checklist items
     if (currentQuestionIndex < currentChecklist.length - 1) {
-      const nextQuestion = currentChecklist[currentQuestionIndex + 1];
-      setMessages((prev) => [...prev, { sender: "bot", text: nextQuestion }]);
+      const next = currentChecklist[currentQuestionIndex + 1];
+      setMessages((prev) => [...prev, { sender: "bot", text: next.question }]);
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setCurrentStep("askChecklist");
     } else {
-      // If no more checklist items, complete the process
       setMessages((prev) => [
         ...prev,
         { sender: "bot", text: "Thank you for completing the process!" },
       ]);
       setCurrentStep("completed");
+      saveResponsesToDB();
     }
-
     triggerAssistant();
   };
 
@@ -185,8 +206,6 @@ const App = () => {
           )}
         </div>
       </div>
-
-      {/* Floating Assistant */}
       <FloatingAssistant isActive={assistantActive} />
     </div>
   );
