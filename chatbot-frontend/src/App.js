@@ -45,15 +45,14 @@ const App = () => {
   const saveResponsesToDB = async () => {
     setLoading(true);
     const formData = new FormData();
-    
-    const formattedResponses = processes[currentProcess].questions.map((_, index) => {
-      const question = processes[currentProcess].questions[index];
+    const formattedResponses = processes[currentProcess]?.questions.map((_, index) => {
+      const question = processes[currentProcess]?.questions[index];
       const responseIndex = messages.findIndex(msg => 
-        msg.sender === 'bot' && (msg.text === question.question || msg.text.props?.children === question.question)
+        msg.sender === 'bot' && (msg.text === question.question || msg.text?.props?.children === question?.question)
       );
       
       let userResponse;
-      if (question.type === 'upload') {
+      if (question?.type === 'upload') {
         userResponse = uploadedFile ? uploadedFile.name : 'Not uploaded';
       } else {
         userResponse = responseIndex !== -1 && messages[responseIndex + 1]?.sender === 'user' 
@@ -67,7 +66,7 @@ const App = () => {
       };
     });
 
-    formData.append('process', currentProcess);
+    formData.append('process', currentProcess);    
     formData.append('responses', JSON.stringify(formattedResponses));
     if (uploadedFile) formData.append('file', uploadedFile);
 
@@ -76,7 +75,7 @@ const App = () => {
         method: 'POST',
         body: formData,
       });
-
+     console.log(response,"RESPONSE!")
       if (!response.ok) throw new Error('Failed to save responses');
       
       setIsSubmitted(true);
@@ -112,10 +111,10 @@ const App = () => {
         break;
         
       case 'askQuestion':
-        const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess].questions.length) * 100;
+        const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess]?.questions.length) * 100;
         setProgress(newProgress);
         
-        if (currentQuestionIndex < processes[currentProcess].questions.length - 1) {
+        if (currentQuestionIndex < processes[currentProcess]?.questions.length - 1) {
           setCurrentQuestionIndex(prev => prev + 1);
           askQuestion(currentQuestionIndex + 1);
         } else {
@@ -129,9 +128,9 @@ const App = () => {
   };
 
   const askQuestion = (index) => {
-    const question = processes[currentProcess].questions[index];
+    const question = processes[currentProcess]?.questions[index];
     
-    if (question.type === 'upload') {
+    if (question?.type === 'upload') {
       setMessages(prev => [...prev, 
         { sender: 'bot', text: (
           <a href={question.url} download className="download-link">
@@ -142,7 +141,7 @@ const App = () => {
       ]);
       setCurrentStep('awaitUpload');
     } else {
-      setMessages(prev => [...prev, { sender: 'bot', text: question.question }]);
+      setMessages(prev => [...prev, { sender: 'bot', text: question?.question }]);
       setCurrentStep('askQuestion');
     }
   };
