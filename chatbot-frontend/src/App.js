@@ -1,212 +1,285 @@
-// Frontend: App.js
-import React, { useState } from "react";
-import "./App.css";
-import FloatingAssistant from "./components/FloatingAssistant";
-
-const onboardingChecklist = [
-  {
-    question: "Please download, sign, and upload the onboarding acknowledgment.",
-    type: "upload",
-    url:
-      "https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EVVruOiHIeRPoJcnnFT-IlMBh57Swffmj-dOZfDfLfIh7A?e=ibsznb",
-  },
-  { question: "Complete the onboarding survey.", type: "text" },
-  { question: "Set up your work account.", type: "text" },
-];
-
-const offboardingChecklist = [
-  {
-    question: "Please download, sign, and upload the offboarding acknowledgment.",
-    type: "upload",
-    url:
-      "https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EQx2WeMLGgFMrN5-3v1LiKwBI4P7e78ig8Wwi11YIGEbMA?e=FYsrgv",
-  },
-  { question: "Return company equipment.", type: "text" },
-  { question: "Complete the exit interview survey.", type: "text" },
-];
+import React, { useState, useEffect } from 'react';
+import './App.css';
 
 const App = () => {
   const [messages, setMessages] = useState([
-    { sender: "bot", text: "Good morning! What is your name?" },
+    { sender: 'bot', text: 'Welcome to the IT Process Assistant! What is your name?' }
   ]);
-  const [input, setInput] = useState("");
-  const [currentStep, setCurrentStep] = useState("askName");
-  const [userName, setUserName] = useState("");
-  const [currentChecklist, setCurrentChecklist] = useState([]);
+  const [input, setInput] = useState('');
+  const [currentStep, setCurrentStep] = useState('askName');
+  const [userName, setUserName] = useState('');
+  const [currentProcess, setCurrentProcess] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [uploadedFile, setUploadedFile] = useState(null);
-  const [assistantActive, setAssistantActive] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const triggerAssistant = () => {
-    setAssistantActive(true);
-    setTimeout(() => setAssistantActive(false), 800);
+  const processes = {
+    onboarding: {
+      name: 'Onboarding',
+      questions: [
+        {
+          question: 'Please download, sign, and upload the onboarding acknowledgment.',
+          type: 'upload',
+          url: '/download/onboarding-acknowledgment.pdf'
+        },
+        { question: 'Complete the onboarding survey.', type: 'text' },
+        { question: 'Set up your work account.', type: 'text' }
+      ]
+    },
+    offboarding: {
+      name: 'Offboarding',
+      questions: [
+        {
+          question: 'Please download, sign, and upload the offboarding acknowledgment.',
+          type: 'upload',
+          url: '/download/offboarding-acknowledgment.pdf'
+        },
+        { question: 'Return company equipment.', type: 'text' },
+        { question: 'Complete the exit interview survey.', type: 'text' }
+      ]
+    }
   };
 
   const saveResponsesToDB = async () => {
+    setLoading(true);
     const formData = new FormData();
+    
+    const formattedResponses = processes[currentProcess].questions.map((_, index) => {
+      const question = processes[currentProcess].questions[index];
+      const responseIndex = messages.findIndex(msg => 
+        msg.sender === 'bot' && (msg.text === question.question || msg.text.props?.children === question.question)
+      );
+      
+      let userResponse;
+      if (question.type === 'upload') {
+        userResponse = uploadedFile ? uploadedFile.name : 'Not uploaded';
+      } else {
+        userResponse = responseIndex !== -1 && messages[responseIndex + 1]?.sender === 'user' 
+          ? messages[responseIndex + 1].text 
+          : 'completed';
+      }
+      
+      return {
+        question: question.question,
+        response: userResponse
+      };
+    });
 
-    const formattedResponses = currentChecklist.slice(0, currentQuestionIndex + 1).map((item) => ({
-      question: item.question,
-      response: item.type === "upload" ? uploadedFile?.name || "N/A" : "completed",
-    }));
-
-    formData.append(
-      "process",
-      currentChecklist === onboardingChecklist ? "onboarding" : "offboarding"
-    );
-    formData.append("responses", JSON.stringify(formattedResponses));
-    if (uploadedFile) formData.append("file", uploadedFile);
+    formData.append('process', currentProcess);
+    formData.append('responses', JSON.stringify(formattedResponses));
+    if (uploadedFile) formData.append('file', uploadedFile);
 
     try {
-      const res = await fetch("http://localhost:5000/responses", {
-        method: "POST",
+      const response = await fetch('http://localhost:5000/responses', {
+        method: 'POST',
         body: formData,
       });
-      if (!res.ok) throw new Error("Failed to save responses");
-      const result = await res.json();
-      console.log("✅ Saved:", result);
-      setTimeout(() => window.location.reload(), 3000);
-    } catch (err) {
-      console.error("❌ Error saving:", err);
+
+      if (!response.ok) throw new Error('Failed to save responses');
+      
+      setIsSubmitted(true);
+      setProgress(100);
+      setMessages(prev => [...prev, 
+        { sender: 'bot', text: `Thank you for completing the ${processes[currentProcess].name} process!` },
+        { sender: 'bot', text: 'Your responses have been successfully saved.' }
+      ]);
+    } catch (error) {
+      setMessages(prev => [...prev, 
+        { sender: 'bot', text: 'There was an error saving your responses. Please try again.' }
+      ]);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSendMessage = () => {
-    if (input.trim() === "") return;
+    if (!input.trim()) return;
+    
+    const userMessage = { sender: 'user', text: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
 
-    const userMessage = { sender: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
-
-    if (currentStep === "askName") {
-      setUserName(input);
-      setMessages((prev) => [
-        ...prev,
-        { sender: "bot", text: `Nice to meet you, ${input}!` },
-        {
-          sender: "bot",
-          text: "Would you like to perform an onboarding or offboarding process?",
-        },
-      ]);
-      setCurrentStep("chooseProcess");
-      triggerAssistant();
-    } else if (currentStep === "askChecklist") {
-      const currentItem = currentChecklist[currentQuestionIndex];
-      if (currentItem.type === "upload") {
-        setMessages((prev) => [
-          ...prev,
-          { sender: "bot", text: "Please upload the signed acknowledgment below." },
+    switch (currentStep) {
+      case 'askName':
+        setUserName(input);
+        setCurrentStep('chooseProcess');
+        setMessages(prev => [...prev, 
+          { sender: 'bot', text: `Nice to meet you, ${input}!` },
+          { sender: 'bot', text: 'Which process would you like to perform today?' }
         ]);
-        setCurrentStep("uploadFile");
-      } else {
-        if (currentQuestionIndex < currentChecklist.length - 1) {
-          const next = currentChecklist[currentQuestionIndex + 1];
-          setMessages((prev) => [...prev, { sender: "bot", text: next.question }]);
-          setCurrentQuestionIndex(currentQuestionIndex + 1);
+        break;
+        
+      case 'askQuestion':
+        const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess].questions.length) * 100;
+        setProgress(newProgress);
+        
+        if (currentQuestionIndex < processes[currentProcess].questions.length - 1) {
+          setCurrentQuestionIndex(prev => prev + 1);
+          askQuestion(currentQuestionIndex + 1);
         } else {
-          setMessages((prev) => [
-            ...prev,
-            { sender: "bot", text: "Thank you for completing the process!" },
-          ]);
-          setCurrentStep("completed");
           saveResponsesToDB();
         }
-        triggerAssistant();
-      }
+        break;
+        
+      default:
+        break;
     }
-
-    setInput("");
   };
 
-  const handleProcessChoice = (type) => {
-    const checklist = type === "onboarding" ? onboardingChecklist : offboardingChecklist;
-    setCurrentChecklist(checklist);
-    const label = type.charAt(0).toUpperCase() + type.slice(1);
-
-    setMessages((prev) => [
-      ...prev,
-      { sender: "bot", text: `Great! Let's start the ${type} process.` },
-      {
-        sender: "bot",
-        text: (
-          <a href={checklist[0].url} download target="_blank" rel="noopener noreferrer">
-            Download {label} Acknowledgment
+  const askQuestion = (index) => {
+    const question = processes[currentProcess].questions[index];
+    
+    if (question.type === 'upload') {
+      setMessages(prev => [...prev, 
+        { sender: 'bot', text: (
+          <a href={question.url} download className="download-link">
+            <i className="icon-download"></i> Download {processes[currentProcess].name} Acknowledgment
           </a>
-        ),
-      },
-      { sender: "bot", text: checklist[0].question },
-    ]);
-    setCurrentStep("askChecklist");
-    triggerAssistant();
+        )},
+        { sender: 'bot', text: question.question }
+      ]);
+      setCurrentStep('awaitUpload');
+    } else {
+      setMessages(prev => [...prev, { sender: 'bot', text: question.question }]);
+      setCurrentStep('askQuestion');
+    }
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    setUploadedFile(file);
-
-    setMessages((prev) => [
-      ...prev,
-      { sender: "bot", text: `File \"${file.name}\" uploaded successfully.` },
+  const handleProcessChoice = (process) => {
+    setCurrentProcess(process);
+    setMessages(prev => [...prev, 
+      { sender: 'bot', text: `Great! Let's start the ${processes[process].name} process.` }
     ]);
+    setCurrentQuestionIndex(0);
+    askQuestion(0);
+  };
 
-    if (currentQuestionIndex < currentChecklist.length - 1) {
-      const next = currentChecklist[currentQuestionIndex + 1];
-      setMessages((prev) => [...prev, { sender: "bot", text: next.question }]);
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setCurrentStep("askChecklist");
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setUploadedFile(file);
+    setMessages(prev => [...prev, 
+      { sender: 'bot', text: `File "${file.name}" uploaded successfully.` }
+    ]);
+    
+    const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess].questions.length) * 100;
+    setProgress(newProgress);
+    
+    if (currentQuestionIndex < processes[currentProcess].questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      askQuestion(currentQuestionIndex + 1);
     } else {
-      setMessages((prev) => [
-        ...prev,
-        { sender: "bot", text: "Thank you for completing the process!" },
-      ]);
-      setCurrentStep("completed");
       saveResponsesToDB();
     }
-    triggerAssistant();
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") handleSendMessage();
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') handleSendMessage();
   };
 
   return (
-    <div className="app">
-      <div className="chat-container">
-        <div className="chat-header">IT Process Checklist</div>
+    <div className="app-container">
+      <div className="chat-app">
+        <div className="chat-header">
+          <div className="header-content">
+            <h1>IT Process Assistant</h1>
+            {currentProcess && (
+              <div className="progress-container">
+                <div className="progress-bar" style={{ width: `${progress}%` }}></div>
+                <span className="progress-text">{Math.round(progress)}% Complete</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
         <div className="chat-messages">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`chat-message ${
-                msg.sender === "user" ? "user-message" : "bot-message"
-              }`}
-            >
-              {msg.text}
+          {messages.map((msg, index) => (
+            <div key={index} className={`message ${msg.sender}`}>
+              {typeof msg.text === 'string' ? msg.text : msg.text}
             </div>
           ))}
-        </div>
-        <div className="chat-input">
-          {currentStep === "chooseProcess" ? (
-            <div>
-              <button onClick={() => handleProcessChoice("onboarding")}>Onboarding</button>
-              <button onClick={() => handleProcessChoice("offboarding")}>Offboarding</button>
+          {loading && (
+            <div className="message bot loading-message">
+              <div className="loading-spinner"></div>
+              <span>Saving your responses...</span>
             </div>
-          ) : currentStep === "uploadFile" ? (
-            <input type="file" onChange={handleFileUpload} />
+          )}
+        </div>
+        
+        <div className="chat-input-area">
+          {isSubmitted ? (
+            <div className="completion-screen">
+              <div className="completion-icon">✓</div>
+              <h2>Process Completed Successfully!</h2>
+              <p>Your {currentProcess && processes[currentProcess].name} process is now complete.</p>
+              <button 
+                className="start-new-btn"
+                onClick={() => window.location.reload()}
+              >
+                Start New Process
+              </button>
+            </div>
+          ) : currentStep === 'chooseProcess' ? (
+            <div className="process-selection">
+              <button 
+                className="process-btn onboarding"
+                onClick={() => handleProcessChoice('onboarding')}
+              >
+                <i className="icon-user-plus"></i>
+                <span>Onboarding</span>
+              </button>
+              <button 
+                className="process-btn offboarding"
+                onClick={() => handleProcessChoice('offboarding')}
+              >
+                <i className="icon-user-minus"></i>
+                <span>Offboarding</span>
+              </button>
+            </div>
+          ) : currentStep === 'awaitUpload' ? (
+            <div className="file-upload-container">
+              <input 
+                type="file" 
+                id="file-upload"
+                onChange={handleFileUpload}
+                className="file-input"
+              />
+              <label htmlFor="file-upload" className="file-upload-btn">
+                <i className="icon-upload"></i>
+                <span>Choose File</span>
+              </label>
+              {uploadedFile && (
+                <div className="file-info">
+                  <i className="icon-file"></i>
+                  <span>{uploadedFile.name}</span>
+                </div>
+              )}
+            </div>
           ) : (
-            <>
+            <div className="text-input-container">
               <input
                 type="text"
-                placeholder="Type a message..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your response..."
+                className="message-input"
+                disabled={loading}
               />
-              <button onClick={handleSendMessage}>Send</button>
-            </>
+              <button 
+                onClick={handleSendMessage}
+                className="send-btn"
+                disabled={!input.trim() || loading}
+              >
+                <i className="icon-send"></i>
+              </button>
+            </div>
           )}
         </div>
       </div>
-      <FloatingAssistant isActive={assistantActive} />
     </div>
   );
 };
