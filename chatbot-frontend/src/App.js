@@ -43,6 +43,7 @@ const App = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [userResponses, setUserResponses] = useState({});
 
   const triggerAssistant = () => {
     setAssistantActive(true);
@@ -74,18 +75,28 @@ const App = () => {
 
 
   const handleProcessChoice = (process) => {
+    if (currentProcess) return; // Prevents double execution and duplicate messages
     if (!processes[process]) {
       console.error(`Invalid process: ${process}`);
       return;
     }
     setCurrentProcess(process);
-    setMessages(prev => [...prev, 
+    setMessages(prev => [
+      ...prev,
       { sender: 'bot', text: `Great! Let's start the ${processes[process].name} process.` }
     ]);
     setCurrentQuestionIndex(0);
-    askQuestion(0);
+    // askQuestion(0); // <-- Remove this line
   };
 
+  // Add useEffect to trigger askQuestion(0) when currentProcess changes
+  React.useEffect(() => {
+    if (currentProcess) {
+      askQuestion(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProcess]);
+  
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -94,6 +105,9 @@ const App = () => {
     setMessages(prev => [...prev, 
       { sender: 'bot', text: `File "${file.name}" uploaded successfully.` }
     ]);
+    // Save file name as response for current question
+    const currentQ = processes[currentProcess].questions[currentQuestionIndex].question;
+    setUserResponses(prev => ({ ...prev, [currentQ]: file.name }));
 
     const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess].questions.length) * 100;
     setProgress(newProgress);
@@ -115,6 +129,11 @@ const App = () => {
     
     const userMessage = { sender: 'user', text: input };
     setMessages(prev => [...prev, userMessage]);
+    // Save user response for current question
+    if (currentStep === 'askQuestion') {
+      const currentQ = processes[currentProcess].questions[currentQuestionIndex].question;
+      setUserResponses(prev => ({ ...prev, [currentQ]: input }));
+    }
     setInput('');
 
     switch (currentStep) {
@@ -138,7 +157,13 @@ const App = () => {
             { sender: 'bot', text: 'Thank you for completing the process!' }
           ]);
           setCurrentStep('completed');
-          saveResponsesToDB();
+          // Ensure the last response is saved before saving to DB
+          const currentQ = processes[currentProcess].questions[currentQuestionIndex].question;
+          setUserResponses(prev => {
+            const updated = { ...prev, [currentQ]: input };
+            setTimeout(() => saveResponsesToDB(updated), 0);
+            return updated;
+          });
         }
         break;
         
@@ -147,26 +172,19 @@ const App = () => {
     }
   };
 
-  const saveResponsesToDB = async () => {
+  const saveResponsesToDB = async (responsesObj = userResponses) => {
     setLoading(true);
     const formData = new FormData();
     
     const formattedResponses = processes[currentProcess].questions.map((question, index) => {
-      let userResponse;
+      let userResponse = responsesObj[question.question];
       if (question.type === 'upload') {
         userResponse = uploadedFile ? uploadedFile.name : 'Not uploaded';
-      } else {
-        const responseIndex = messages.findIndex(msg => 
-          msg.sender === 'bot' && (msg.text === question.question || msg.text.props?.children === question.question)
-        );
-        userResponse = responseIndex !== -1 && messages[responseIndex + 1]?.sender === 'user' 
-          ? messages[responseIndex + 1].text 
-          : 'completed';
       }
       
       return {
         question: question.question,
-        response: userResponse
+        response: userResponse || 'Not answered'
       };
     });
 
@@ -262,15 +280,21 @@ const App = () => {
             </div>
           ) : currentStep === 'awaitUpload' ? (
             <div className="file-upload-container">
+              <div className="upload-instructions">
+                <strong>Step 1:</strong> Download the document using the link above.<br/>
+                <strong>Step 2:</strong> Sign the document.<br/>
+                <strong>Step 3:</strong> Upload the signed PDF below.
+              </div>
               <input 
                 type="file" 
                 id="file-upload"
+                accept=".pdf"
                 onChange={handleFileUpload}
                 className="file-input"
               />
               <label htmlFor="file-upload" className="file-upload-btn">
                 <i className="icon-upload"></i>
-                <span>Choose File</span>
+                <span>Choose PDF File</span>
               </label>
               {uploadedFile && (
                 <div className="file-info">
@@ -302,6 +326,24 @@ const App = () => {
         </div>
       </div>
       <FloatingAssistant isActive={assistantActive} />
+      {/* Debug Panel Start */}
+      <div style={{
+        position: 'fixed',
+        bottom: 10,
+        right: 10,
+        background: 'rgba(0,0,0,0.7)',
+        color: '#fff',
+        padding: '10px 20px',
+        borderRadius: '8px',
+        fontSize: '14px',
+        zIndex: 9999
+      }}>
+        <div><strong>Debug Info</strong></div>
+        <div>currentStep: {currentStep}</div>
+        <div>currentProcess: {currentProcess ? currentProcess : 'null'}</div>
+        <div>currentQuestionIndex: {currentQuestionIndex}</div>
+      </div>
+      {/* Debug Panel End */}
     </div>
   );
 };
