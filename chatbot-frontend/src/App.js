@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import FloatingAssistant from "./components/FloatingAssistant";
 
@@ -45,6 +45,20 @@ const App = () => {
   const [progress, setProgress] = useState(0);
   const [userResponses, setUserResponses] = useState({});
   const hasSaved = React.useRef(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Check localStorage for theme preference
+    return localStorage.getItem('darkMode') === 'true';
+  });
+
+  useEffect(() => {
+    const appContainer = document.querySelector('.app-container');
+    if (darkMode) {
+      appContainer?.classList.add('dark-mode');
+    } else {
+      appContainer?.classList.remove('dark-mode');
+    }
+    localStorage.setItem('darkMode', darkMode);
+  }, [darkMode]);
 
   const triggerAssistant = () => {
     setAssistantActive(true);
@@ -225,6 +239,28 @@ const App = () => {
         <div className="chat-header">
           <div className="header-content">
             <h1>IT Process Assistant</h1>
+            <button
+              className="dark-mode-toggle"
+              style={{
+                position: 'absolute',
+                top: 20,
+                right: 24,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.5rem',
+                color: 'inherit',
+                zIndex: 10
+              }}
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={() => setDarkMode(dm => !dm)}
+            >
+              {darkMode ? (
+                <span role="img" aria-label="Light mode">☀️</span>
+              ) : (
+                <span role="img" aria-label="Dark mode">🌙</span>
+              )}
+            </button>
             {currentProcess && (
               <div className="progress-container">
                 <div className="progress-bar" style={{ width: `${progress}%` }}></div>
@@ -319,31 +355,18 @@ const App = () => {
                 className="send-btn"
                 disabled={!input.trim() || loading}
               >
-                <i className="icon-send"></i>
+                <span className="arrow" aria-label="Send">
+                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 11H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 4L19 11L12 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </span>
               </button>
             </div>
           )}
         </div>
       </div>
       <FloatingAssistant isActive={assistantActive} />
-      {/* Debug Panel Start */}
-      <div style={{
-        position: 'fixed',
-        bottom: 10,
-        right: 10,
-        background: 'rgba(0,0,0,0.7)',
-        color: '#fff',
-        padding: '10px 20px',
-        borderRadius: '8px',
-        fontSize: '14px',
-        zIndex: 9999
-      }}>
-        <div><strong>Debug Info</strong></div>
-        <div>currentStep: {currentStep}</div>
-        <div>currentProcess: {currentProcess ? currentProcess : 'null'}</div>
-        <div>currentQuestionIndex: {currentQuestionIndex}</div>
-      </div>
-      {/* Debug Panel End */}
     </div>
   );
 };
