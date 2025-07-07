@@ -1,5 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
+import React, { useState } from "react";
+import "./App.css";
+import FloatingAssistant from "./components/FloatingAssistant";
+
+const processes = {
+  onboarding: {
+    name: 'Onboarding',
+    questions: [
+      {
+        question: 'Please download, sign, and upload the onboarding acknowledgment.',
+        type: 'upload',
+        url: 'https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EVVruOiHIeRPoJcnnFT-IlMBh57Swffmj-dOZfDfLfIh7A?e=ibsznb'
+      },
+      { question: 'Complete the onboarding survey.', type: 'text' },
+      { question: 'Set up your work account.', type: 'text' }
+    ]
+  },
+  offboarding: {
+    name: 'Offboarding',
+    questions: [
+      {
+        question: 'Please download, sign, and upload the offboarding acknowledgment.',
+        type: 'upload',
+        url: 'https://tumasgrp.sharepoint.com/:t:/s/Testsite_PowerAutomate/EQx2WeMLGgFMrN5-3v1LiKwBI4P7e78ig8Wwi11YIGEbMA?e=FYsrgv'
+      },
+      { question: 'Return company equipment.', type: 'text' },
+      { question: 'Complete the exit interview survey.', type: 'text' }
+    ]
+  }
+};
 
 const App = () => {
   const [messages, setMessages] = useState([
@@ -11,142 +39,45 @@ const App = () => {
   const [currentProcess, setCurrentProcess] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [assistantActive, setAssistantActive] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  const processes = {
-    onboarding: {
-      name: 'Onboarding',
-      questions: [
-        {
-          question: 'Please download, sign, and upload the onboarding acknowledgment.',
-          type: 'upload',
-          url: '/download/onboarding-acknowledgment.pdf'
-        },
-        { question: 'Complete the onboarding survey.', type: 'text' },
-        { question: 'Set up your work account.', type: 'text' }
-      ]
-    },
-    offboarding: {
-      name: 'Offboarding',
-      questions: [
-        {
-          question: 'Please download, sign, and upload the offboarding acknowledgment.',
-          type: 'upload',
-          url: '/download/offboarding-acknowledgment.pdf'
-        },
-        { question: 'Return company equipment.', type: 'text' },
-        { question: 'Complete the exit interview survey.', type: 'text' }
-      ]
-    }
+  const triggerAssistant = () => {
+    setAssistantActive(true);
+    setTimeout(() => setAssistantActive(false), 800);
   };
 
-  const saveResponsesToDB = async () => {
-    setLoading(true);
-    const formData = new FormData();
-    const formattedResponses = processes[currentProcess]?.questions.map((_, index) => {
-      const question = processes[currentProcess]?.questions[index];
-      const responseIndex = messages.findIndex(msg => 
-        msg.sender === 'bot' && (msg.text === question.question || msg.text?.props?.children === question?.question)
-      );
-      
-      let userResponse;
-      if (question?.type === 'upload') {
-        userResponse = uploadedFile ? uploadedFile.name : 'Not uploaded';
-      } else {
-        userResponse = responseIndex !== -1 && messages[responseIndex + 1]?.sender === 'user' 
-          ? messages[responseIndex + 1].text 
-          : 'completed';
-      }
-      
-      return {
-        question: question.question,
-        response: userResponse
-      };
-    });
-
-    formData.append('process', currentProcess);    
-    formData.append('responses', JSON.stringify(formattedResponses));
-    if (uploadedFile) formData.append('file', uploadedFile);
-
-    try {
-      const response = await fetch('http://localhost:5000/responses', {
-        method: 'POST',
-        body: formData,
-      });
-     console.log(response,"RESPONSE!")
-      if (!response.ok) throw new Error('Failed to save responses');
-      
-      setIsSubmitted(true);
-      setProgress(100);
-      setMessages(prev => [...prev, 
-        { sender: 'bot', text: `Thank you for completing the ${processes[currentProcess].name} process!` },
-        { sender: 'bot', text: 'Your responses have been successfully saved.' }
-      ]);
-    } catch (error) {
-      setMessages(prev => [...prev, 
-        { sender: 'bot', text: 'There was an error saving your responses. Please try again.' }
-      ]);
-    } finally {
-      setLoading(false);
-    }
+ const askQuestion = (index) => {
+  if (!processes[currentProcess] || !processes[currentProcess].questions[index]) {
+    console.error("Invalid process or question index");
+    return;
+  }
+  const question = processes[currentProcess].questions[index];
+  
+  if (question.type === 'upload') {
+    setMessages(prev => [...prev, 
+      { sender: 'bot', text: (
+        <a href={question.url} download className="download-link">
+          <i className="icon-download"></i> Download {processes[currentProcess].name} Acknowledgment
+        </a>
+      )},
+      { sender: 'bot', text: question.question }
+    ]);
+    setCurrentStep('awaitUpload');
+  } else {
+    setMessages(prev => [...prev, { sender: 'bot', text: question.question }]);
+    setCurrentStep('askQuestion');
+  }
   };
 
-  const handleSendMessage = () => {
-    if (!input.trim()) return;
-    
-    const userMessage = { sender: 'user', text: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-
-    switch (currentStep) {
-      case 'askName':
-        setUserName(input);
-        setCurrentStep('chooseProcess');
-        setMessages(prev => [...prev, 
-          { sender: 'bot', text: `Nice to meet you, ${input}!` },
-          { sender: 'bot', text: 'Which process would you like to perform today?' }
-        ]);
-        break;
-        
-      case 'askQuestion':
-        const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess]?.questions.length) * 100;
-        setProgress(newProgress);
-        
-        if (currentQuestionIndex < processes[currentProcess]?.questions.length - 1) {
-          setCurrentQuestionIndex(prev => prev + 1);
-          askQuestion(currentQuestionIndex + 1);
-        } else {
-          saveResponsesToDB();
-        }
-        break;
-        
-      default:
-        break;
-    }
-  };
-
-  const askQuestion = (index) => {
-    const question = processes[currentProcess]?.questions[index];
-    
-    if (question?.type === 'upload') {
-      setMessages(prev => [...prev, 
-        { sender: 'bot', text: (
-          <a href={question.url} download className="download-link">
-            <i className="icon-download"></i> Download {processes[currentProcess].name} Acknowledgment
-          </a>
-        )},
-        { sender: 'bot', text: question.question }
-      ]);
-      setCurrentStep('awaitUpload');
-    } else {
-      setMessages(prev => [...prev, { sender: 'bot', text: question?.question }]);
-      setCurrentStep('askQuestion');
-    }
-  };
 
   const handleProcessChoice = (process) => {
+    if (!processes[process]) {
+      console.error(`Invalid process: ${process}`);
+      return;
+    }
     setCurrentProcess(process);
     setMessages(prev => [...prev, 
       { sender: 'bot', text: `Great! Let's start the ${processes[process].name} process.` }
@@ -163,7 +94,7 @@ const App = () => {
     setMessages(prev => [...prev, 
       { sender: 'bot', text: `File "${file.name}" uploaded successfully.` }
     ]);
-    
+
     const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess].questions.length) * 100;
     setProgress(newProgress);
     
@@ -171,7 +102,98 @@ const App = () => {
       setCurrentQuestionIndex(prev => prev + 1);
       askQuestion(currentQuestionIndex + 1);
     } else {
+      setMessages(prev => [...prev, 
+        { sender: 'bot', text: 'Thank you for completing the process!' }
+      ]);
+      setCurrentStep('completed');
       saveResponsesToDB();
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!input.trim()) return;
+    
+    const userMessage = { sender: 'user', text: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+
+    switch (currentStep) {
+      case 'askName':
+        setUserName(input);
+        setCurrentStep('chooseProcess');
+        setMessages(prev => [...prev, 
+          { sender: 'bot', text: `Nice to meet you, ${input}!` }
+        ]);
+        break;
+        
+      case 'askQuestion':
+        const newProgress = ((currentQuestionIndex + 1) / processes[currentProcess].questions.length) * 100;
+        setProgress(newProgress);
+        
+        if (currentQuestionIndex < processes[currentProcess].questions.length - 1) {
+          setCurrentQuestionIndex(prev => prev + 1);
+          askQuestion(currentQuestionIndex + 1);
+        } else {
+          setMessages(prev => [...prev, 
+            { sender: 'bot', text: 'Thank you for completing the process!' }
+          ]);
+          setCurrentStep('completed');
+          saveResponsesToDB();
+        }
+        break;
+        
+      default:
+        break;
+    }
+  };
+
+  const saveResponsesToDB = async () => {
+    setLoading(true);
+    const formData = new FormData();
+    
+    const formattedResponses = processes[currentProcess].questions.map((question, index) => {
+      let userResponse;
+      if (question.type === 'upload') {
+        userResponse = uploadedFile ? uploadedFile.name : 'Not uploaded';
+      } else {
+        const responseIndex = messages.findIndex(msg => 
+          msg.sender === 'bot' && (msg.text === question.question || msg.text.props?.children === question.question)
+        );
+        userResponse = responseIndex !== -1 && messages[responseIndex + 1]?.sender === 'user' 
+          ? messages[responseIndex + 1].text 
+          : 'completed';
+      }
+      
+      return {
+        question: question.question,
+        response: userResponse
+      };
+    });
+
+    formData.append('process', currentProcess);
+    formData.append('responses', JSON.stringify(formattedResponses));
+    if (uploadedFile) formData.append('file', uploadedFile);
+
+    try {
+      const response = await fetch('http://localhost:5000/responses', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Failed to save responses');
+      
+      setIsSubmitted(true);
+      setProgress(100);
+      setMessages(prev => [...prev, 
+        { sender: 'bot', text: `Thank you for completing the ${processes[currentProcess].name} process!` },
+        { sender: 'bot', text: 'Your responses have been successfully saved.' }
+      ]);
+    } catch (error) {
+      setMessages(prev => [...prev, 
+        { sender: 'bot', text: 'There was an error saving your responses. Please try again.' }
+      ]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -279,6 +301,7 @@ const App = () => {
           )}
         </div>
       </div>
+      <FloatingAssistant isActive={assistantActive} />
     </div>
   );
 };
