@@ -46,9 +46,13 @@ const App = () => {
   const [userResponses, setUserResponses] = useState({});
   const hasSaved = React.useRef(false);
   // Dark mode state
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem('darkMode') === 'true';
-  });
+  // Use system theme as default if no user preference
+  const getPreferredTheme = () => {
+    const stored = localStorage.getItem('darkMode');
+    if (stored !== null) return stored === 'true';
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  };
+  const [darkMode, setDarkMode] = useState(getPreferredTheme);
 
   useEffect(() => {
     const appContainer = document.querySelector('.app-container');
@@ -59,6 +63,18 @@ const App = () => {
     }
     localStorage.setItem('darkMode', darkMode);
   }, [darkMode]);
+
+  // Listen for system theme changes if user hasn't chosen a theme
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (localStorage.getItem('darkMode') === null) {
+        setDarkMode(media.matches);
+      }
+    };
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, []);
 
   const triggerAssistant = () => {
     setAssistantActive(true);
@@ -259,7 +275,13 @@ const App = () => {
                   zIndex: 10
                 }}
                 aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-                onClick={() => setDarkMode(dm => !dm)}
+                onClick={() => {
+                  setDarkMode(dm => {
+                    const newMode = !dm;
+                    localStorage.setItem('darkMode', newMode);
+                    return newMode;
+                  });
+                }}
               >
                 {darkMode ? (
                   <span role="img" aria-label="Light mode">☀️</span>
@@ -374,7 +396,7 @@ const App = () => {
         </div>
         {/* --- End of chat app code --- */}
       </div>
-      <div style={{ flex: 1, height: "100vh" }}>
+      <div style={{ flex: 1, height: "100vh", background: "#f5f7fa" }}>
         <Spline scene="https://prod.spline.design/NvbiDbYncf06kC4w/scene.splinecode" />
       </div>
     </div>
