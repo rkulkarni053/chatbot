@@ -44,6 +44,7 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [userResponses, setUserResponses] = useState({});
+  const hasSaved = React.useRef(false);
 
   const triggerAssistant = () => {
     setAssistantActive(true);
@@ -153,9 +154,6 @@ const App = () => {
           setCurrentQuestionIndex(prev => prev + 1);
           askQuestion(currentQuestionIndex + 1);
         } else {
-          setMessages(prev => [...prev, 
-            { sender: 'bot', text: 'Thank you for completing the process!' }
-          ]);
           setCurrentStep('completed');
           // Ensure the last response is saved before saving to DB
           const currentQ = processes[currentProcess].questions[currentQuestionIndex].question;
@@ -173,6 +171,8 @@ const App = () => {
   };
 
   const saveResponsesToDB = async (responsesObj = userResponses) => {
+    if (hasSaved.current) return;
+    hasSaved.current = true;
     setLoading(true);
     const formData = new FormData();
     
