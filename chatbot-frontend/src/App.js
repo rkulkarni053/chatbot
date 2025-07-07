@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-import FloatingAssistant from "./components/FloatingAssistant";
+import Spline from '@splinetool/react-spline';
 
 const processes = {
   onboarding: {
@@ -45,8 +45,8 @@ const App = () => {
   const [progress, setProgress] = useState(0);
   const [userResponses, setUserResponses] = useState({});
   const hasSaved = React.useRef(false);
+  // Dark mode state
   const [darkMode, setDarkMode] = useState(() => {
-    // Check localStorage for theme preference
     return localStorage.getItem('darkMode') === 'true';
   });
 
@@ -64,6 +64,9 @@ const App = () => {
     setAssistantActive(true);
     setTimeout(() => setAssistantActive(false), 800);
   };
+
+  // Render message text as is (no mode label)
+  const renderMessageText = (msg) => msg.text;
 
  const askQuestion = (index) => {
   if (!processes[currentProcess] || !processes[currentProcess].questions[index]) {
@@ -234,139 +237,146 @@ const App = () => {
   };
 
   return (
-    <div className="app-container">
-      <div className="chat-app">
-        <div className="chat-header">
-          <div className="header-content">
-            <h1>IT Process Assistant</h1>
-            <button
-              className="dark-mode-toggle"
-              style={{
-                position: 'absolute',
-                top: 20,
-                right: 24,
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '1.5rem',
-                color: 'inherit',
-                zIndex: 10
-              }}
-              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              onClick={() => setDarkMode(dm => !dm)}
-            >
-              {darkMode ? (
-                <span role="img" aria-label="Light mode">☀️</span>
-              ) : (
-                <span role="img" aria-label="Dark mode">🌙</span>
+    <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
+      <div className="app-container" style={{ flex: "0 0 480px", minWidth: 350 }}>
+        {/* --- All your chat app code below here --- */}
+        <div className="chat-app">
+          <div className="chat-header">
+            <div className="header-content">
+              <h1>IT Process Assistant</h1>
+              {/* Dark mode toggle button */}
+              <button
+                className="dark-mode-toggle"
+                style={{
+                  position: 'absolute',
+                  top: 20,
+                  right: 24,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1.5rem',
+                  color: 'inherit',
+                  zIndex: 10
+                }}
+                aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                onClick={() => setDarkMode(dm => !dm)}
+              >
+                {darkMode ? (
+                  <span role="img" aria-label="Light mode">☀️</span>
+                ) : (
+                  <span role="img" aria-label="Dark mode">🌙</span>
+                )}
+              </button>
+              {currentProcess && (
+                <div className="progress-container">
+                  <div className="progress-bar" style={{ width: `${progress}%` }}></div>
+                  <span className="progress-text">{Math.round(progress)}% Complete</span>
+                </div>
               )}
-            </button>
-            {currentProcess && (
-              <div className="progress-container">
-                <div className="progress-bar" style={{ width: `${progress}%` }}></div>
-                <span className="progress-text">{Math.round(progress)}% Complete</span>
+            </div>
+          </div>
+          <div className="chat-messages">
+            {messages.map((msg, index) => (
+              <div key={index} className={`message ${msg.sender} ${darkMode ? 'dark' : 'light'}`}>
+                {typeof msg.text === 'string' ? renderMessageText(msg) : msg.text}
+              </div>
+            ))}
+            {loading && (
+              <div className="message bot loading-message">
+                <div className="loading-spinner"></div>
+                <span>Saving your responses...</span>
+              </div>
+            )}
+          </div>
+          <div className="chat-input-area">
+            {isSubmitted ? (
+              <div className="completion-screen">
+                <div className="completion-icon">✓</div>
+                <h2>Process Completed Successfully!</h2>
+                <p>Your {currentProcess && processes[currentProcess].name} process is now complete.</p>
+                <button 
+                  className="start-new-btn"
+                  onClick={() => window.location.reload()}
+                >
+                  Start New Process
+                </button>
+              </div>
+            ) : currentStep === 'chooseProcess' ? (
+              <div className="process-selection">
+                <button 
+                  className="process-btn onboarding"
+                  onClick={() => handleProcessChoice('onboarding')}
+                >
+                  <i className="icon-user-plus"></i>
+                  <span>Onboarding</span>
+                </button>
+                <button 
+                  className="process-btn offboarding"
+                  onClick={() => handleProcessChoice('offboarding')}
+                >
+                  <i className="icon-user-minus"></i>
+                  <span>Offboarding</span>
+                </button>
+              </div>
+            ) : currentStep === 'awaitUpload' ? (
+              <div className="file-upload-container">
+                <div className="upload-instructions">
+                  <strong>Step 1:</strong> Download the document using the link above.<br/>
+                  <strong>Step 2:</strong> Sign the document.<br/>
+                  <strong>Step 3:</strong> Upload the signed PDF below.
+                </div>
+                <input 
+                  type="file" 
+                  id="file-upload"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="file-input"
+                />
+                <label htmlFor="file-upload" className="file-upload-btn">
+                  <i className="icon-upload"></i>
+                  <span>Choose PDF File</span>
+                </label>
+                {uploadedFile && (
+                  <div className="file-info">
+                    <i className="icon-file"></i>
+                    <span>{uploadedFile.name}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-input-container">
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type your response..."
+                  className="message-input"
+                  disabled={loading}
+                  style={{ color: darkMode ? 'var(--dm-dark)' : 'var(--dark-color)' }}
+                />
+                <button 
+                  onClick={handleSendMessage}
+                  className="send-btn"
+                  disabled={!input.trim() || loading}
+                  aria-label="Send"
+                >
+                  <span className="arrow" aria-label="Send">
+                    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 11H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M12 4L19 11L12 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </span>
+                </button>
               </div>
             )}
           </div>
         </div>
-        
-        <div className="chat-messages">
-          {messages.map((msg, index) => (
-            <div key={index} className={`message ${msg.sender}`}>
-              {typeof msg.text === 'string' ? msg.text : msg.text}
-            </div>
-          ))}
-          {loading && (
-            <div className="message bot loading-message">
-              <div className="loading-spinner"></div>
-              <span>Saving your responses...</span>
-            </div>
-          )}
-        </div>
-        
-        <div className="chat-input-area">
-          {isSubmitted ? (
-            <div className="completion-screen">
-              <div className="completion-icon">✓</div>
-              <h2>Process Completed Successfully!</h2>
-              <p>Your {currentProcess && processes[currentProcess].name} process is now complete.</p>
-              <button 
-                className="start-new-btn"
-                onClick={() => window.location.reload()}
-              >
-                Start New Process
-              </button>
-            </div>
-          ) : currentStep === 'chooseProcess' ? (
-            <div className="process-selection">
-              <button 
-                className="process-btn onboarding"
-                onClick={() => handleProcessChoice('onboarding')}
-              >
-                <i className="icon-user-plus"></i>
-                <span>Onboarding</span>
-              </button>
-              <button 
-                className="process-btn offboarding"
-                onClick={() => handleProcessChoice('offboarding')}
-              >
-                <i className="icon-user-minus"></i>
-                <span>Offboarding</span>
-              </button>
-            </div>
-          ) : currentStep === 'awaitUpload' ? (
-            <div className="file-upload-container">
-              <div className="upload-instructions">
-                <strong>Step 1:</strong> Download the document using the link above.<br/>
-                <strong>Step 2:</strong> Sign the document.<br/>
-                <strong>Step 3:</strong> Upload the signed PDF below.
-              </div>
-              <input 
-                type="file" 
-                id="file-upload"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                className="file-input"
-              />
-              <label htmlFor="file-upload" className="file-upload-btn">
-                <i className="icon-upload"></i>
-                <span>Choose PDF File</span>
-              </label>
-              {uploadedFile && (
-                <div className="file-info">
-                  <i className="icon-file"></i>
-                  <span>{uploadedFile.name}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-input-container">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Type your response..."
-                className="message-input"
-                disabled={loading}
-              />
-              <button 
-                onClick={handleSendMessage}
-                className="send-btn"
-                disabled={!input.trim() || loading}
-              >
-                <span className="arrow" aria-label="Send">
-                  <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 11H19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M12 4L19 11L12 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
+        {/* --- End of chat app code --- */}
       </div>
-      <FloatingAssistant isActive={assistantActive} />
+      <div style={{ flex: 1, height: "100vh" }}>
+        <Spline scene="https://prod.spline.design/NvbiDbYncf06kC4w/scene.splinecode" />
+      </div>
     </div>
   );
 };
