@@ -254,7 +254,15 @@ const App = () => {
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
-      <div className="app-container" style={{ flex: "0 0 480px", minWidth: 350 }}>
+      <div className="app-container"
+        style={{
+          flexBasis: '100%',
+          maxWidth: 480,
+          width: '100%',
+          minWidth: 0,
+          flexShrink: 1
+        }}
+      >
         {/* --- All your chat app code below here --- */}
         <div className="chat-app">
           <div className="chat-header">
@@ -396,7 +404,10 @@ const App = () => {
         </div>
         {/* --- End of chat app code --- */}
       </div>
-      <div style={{ flex: 1, height: "100vh", background: "#f5f7fa" }}>
+      <div
+        className="spline-area"
+        style={{ flex: 1, height: "100vh", background: "#f5f7fa", display: 'block' }}
+      >
         <Spline scene="https://prod.spline.design/NvbiDbYncf06kC4w/scene.splinecode" />
       </div>
     </div>
