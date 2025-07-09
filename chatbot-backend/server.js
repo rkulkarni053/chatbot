@@ -4,7 +4,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const bodyParser = require("body-parser");
-const sqlite3 = require("sqlite3").verbose(); // Add SQLite
+const sqlite3 = require("sqlite3").verbose();
 const app = express();
 const cors = require("cors");
 
@@ -32,22 +32,21 @@ const db = new sqlite3.Database("./responses.db", (err) => {
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static("public")); // Serve static files from public folder
+app.use(express.static("public"));
 
-// Paths (keep your existing file handling setup)
-const uploadFolder = path.join(__dirname, "uploads");
-const downloadFolder = path.join(__dirname, "downloads");
+// OneDrive uploads folder path
+const oneDriveUploadsPath = "C:\\Users\\rkulkarni\\OneDrive - Tumas Group Management Co\\IT Department - Documents\\notebook list 2024 - 2025\\uploads";
 
-// Ensure folders exist
-if (!fs.existsSync(uploadFolder))
-  fs.mkdirSync(uploadFolder, { recursive: true });
-if (!fs.existsSync(downloadFolder))
-  fs.mkdirSync(downloadFolder, { recursive: true });
+// Ensure OneDrive uploads folder exists
+if (!fs.existsSync(oneDriveUploadsPath)) {
+  fs.mkdirSync(oneDriveUploadsPath, { recursive: true });
+  console.log(`Created OneDrive uploads folder: ${oneDriveUploadsPath}`);
+}
 
-// Multer setup (keep your existing configuration)
+// Multer setup for OneDrive uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, uploadFolder);
+    cb(null, oneDriveUploadsPath);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -60,7 +59,7 @@ app.post("/responses", upload.single("file"), async (req, res) => {
   const { process } = req.body;
   const file = req.file;
 
-  // ✅ Parse responses from string to array
+  // Parse responses from string to array
   let responses;
   try {
     responses = JSON.parse(req.body.responses);
@@ -71,7 +70,12 @@ app.post("/responses", upload.single("file"), async (req, res) => {
     return res.status(400).send("Invalid JSON format for responses.");
   }
 
-  const filePath = file ? path.join(uploadFolder, file.filename) : null;
+  const filePath = file ? path.join(oneDriveUploadsPath, file.filename) : null;
+
+  if (file) {
+    console.log(`File uploaded to OneDrive: ${file.filename}`);
+    console.log(`Full path: ${filePath}`);
+  }
 
   const stmt = db.prepare(`
     INSERT INTO responses (process, question, response, file_path)
@@ -79,7 +83,7 @@ app.post("/responses", upload.single("file"), async (req, res) => {
   `);
 
   try {
-    // ✅ Loop over array and insert each row
+    // Loop over array and insert each row
     for (const response of responses) {
       await new Promise((resolve, reject) => {
         stmt.run(
@@ -109,9 +113,10 @@ app.post("/responses", upload.single("file"), async (req, res) => {
 app.get("/", (req, res) => {
   res.send("HI");
 });
+
 app.get("/download/:fileName", (req, res) => {
   const fileName = req.params.fileName;
-  const filePath = path.join(downloadFolder, fileName);
+  const filePath = path.join(oneDriveUploadsPath, fileName);
 
   if (fs.existsSync(filePath)) {
     res.download(filePath, fileName, (err) => {
@@ -136,7 +141,8 @@ app.get("/responses", (req, res) => {
 });
 
 // Start server
-const PORT = 5000;
+const PORT = 5600;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Files will be saved to: ${oneDriveUploadsPath}`);
 });

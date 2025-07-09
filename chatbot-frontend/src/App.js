@@ -94,7 +94,7 @@ const App = () => {
   if (question.type === 'upload') {
     setMessages(prev => [...prev, 
       { sender: 'bot', text: (
-        <a href={question.url} download className="download-link">
+        <a href={question.url} download className="download-link" target="_blank" rel="noopener noreferrer">
           <i className="icon-download"></i> Download {processes[currentProcess].name} Acknowledgment
         </a>
       )},
@@ -226,7 +226,7 @@ const App = () => {
     if (uploadedFile) formData.append('file', uploadedFile);
 
     try {
-      const response = await fetch('http://localhost:5000/responses', {
+      const response = await fetch('http://localhost:5600/responses', {
         method: 'POST',
         body: formData,
       });
