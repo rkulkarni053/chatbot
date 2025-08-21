@@ -45,6 +45,38 @@ const App = () => {
   const [progress, setProgress] = useState(0);
   const [userResponses, setUserResponses] = useState({});
   const hasSaved = React.useRef(false);
+  
+  // Spline loading states
+  const [splineLoading, setSplineLoading] = useState(false);
+  const [splineError, setSplineError] = useState(false);
+  const [splineLoaded, setSplineLoaded] = useState(false);
+  const [splineShouldLoad, setSplineShouldLoad] = useState(false);
+  
+  // Add loading timeout for Spline
+  useEffect(() => {
+    if (splineLoading && splineShouldLoad) {
+      const timeout = setTimeout(() => {
+        if (splineLoading) {
+          setSplineError(true);
+          setSplineLoading(false);
+          console.log('Spline loading timeout - taking too long');
+        }
+      }, 30000); // 30 second timeout
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [splineLoading, splineShouldLoad]);
+  
+  // Debug Spline states
+  useEffect(() => {
+    console.log('Spline states:', {
+      shouldLoad: splineShouldLoad,
+      loading: splineLoading,
+      loaded: splineLoaded,
+      error: splineError
+    });
+  }, [splineShouldLoad, splineLoading, splineLoaded, splineError]);
+  
   // Dark mode state
   // Use system theme as default if no user preference
   const getPreferredTheme = () => {
@@ -79,6 +111,11 @@ const App = () => {
   const triggerAssistant = () => {
     setAssistantActive(true);
     setTimeout(() => setAssistantActive(false), 800);
+    
+    // Trigger Spline loading on first user interaction
+    if (!splineShouldLoad) {
+      setSplineShouldLoad(true);
+    }
   };
 
   // Render message text as is (no mode label)
@@ -264,8 +301,13 @@ const App = () => {
         }}
       >
         {/* --- All your chat app code below here --- */}
-        <div className="chat-app">
-          <div className="chat-header">
+                 <div className="chat-app" onClick={() => {
+           if (!splineShouldLoad) {
+             setSplineShouldLoad(true);
+             setSplineLoading(true);
+           }
+         }}>
+           <div className="chat-header">
             <div className="header-content">
               <h1>IT Process Assistant</h1>
               {/* Dark mode toggle button */}
@@ -408,7 +450,78 @@ const App = () => {
         className="spline-area"
         style={{ flex: 1, height: "100vh", background: "#f5f7fa", display: 'block' }}
       >
-        <Spline scene="https://prod.spline.design/NvbiDbYncf06kC4w/scene.splinecode" />
+        {splineLoading && (
+          <div className="spline-loading">
+            <div className="loading-spinner"></div>
+            <p>Loading 3D Scene...</p>
+          </div>
+        )}
+        
+        {!splineShouldLoad && (
+          <div className="spline-placeholder" onClick={() => {
+            setSplineShouldLoad(true);
+            setSplineLoading(true);
+          }}>
+            <div className="placeholder-icon">🎨</div>
+            <p>Interactive 3D Scene</p>
+            <small>Click here to load the 3D scene</small>
+          </div>
+        )}
+        
+        {splineError && (
+          <div className="spline-error">
+            <div className="error-icon">⚠️</div>
+            <p>3D Scene Failed to Load</p>
+            <button onClick={() => window.location.reload()} className="retry-btn">
+              Retry
+            </button>
+          </div>
+        )}
+        
+        {splineShouldLoad && (
+          <>
+            {splineLoading && (
+              <div className="spline-loading">
+                <div className="loading-spinner"></div>
+                <p>Loading 3D Scene...</p>
+                <small>This may take a few moments</small>
+                <button 
+                  onClick={() => {
+                    setSplineLoading(false);
+                    setSplineError(true);
+                  }} 
+                  className="cancel-btn"
+                  style={{ marginTop: '1rem' }}
+                >
+                  Cancel Loading
+                </button>
+              </div>
+            )}
+            
+            <Spline 
+              scene="https://prod.spline.design/NvbiDbYncf06kC4w/scene.splinecode"
+              // Fallback to a simpler scene if needed:
+              // scene="https://prod.spline.design/6Wq1Q7YGyM-iab9x/scene.splinecode"
+              onLoad={() => {
+                console.log('Spline onLoad triggered');
+                setSplineLoading(false);
+                setSplineLoaded(true);
+                console.log('Spline scene loaded successfully');
+              }}
+              onError={(error) => {
+                console.log('Spline onError triggered:', error);
+                setSplineLoading(false);
+                setSplineError(true);
+                console.error('Spline loading error:', error);
+              }}
+              style={{ 
+                display: splineLoaded ? 'block' : 'none',
+                opacity: splineLoaded ? 1 : 0,
+                transition: 'opacity 0.5s ease-in-out'
+              }}
+            />
+          </>
+        )}
       </div>
     </div>
   );

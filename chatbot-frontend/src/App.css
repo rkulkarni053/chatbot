@@ -564,3 +564,159 @@ body {
     padding: 1.2rem 0.5rem 1.2rem 0.5rem;
   }
 }
+
+/* Spline Loading States */
+.spline-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  color: var(--dark-color);
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e3e3e3;
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spline-loading p {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0 0 0.5rem 0;
+  color: var(--gray-color);
+}
+
+.spline-loading small {
+  font-size: 0.9rem;
+  color: var(--gray-color);
+  opacity: 0.8;
+  margin-bottom: 1rem;
+}
+
+.cancel-btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--gray-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 0.9rem;
+}
+
+.cancel-btn:hover {
+  background-color: #5a6268;
+}
+
+.spline-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%);
+  color: var(--dark-color);
+  text-align: center;
+  padding: 2rem;
+}
+
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.spline-error p {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin: 0 0 1.5rem 0;
+  color: var(--gray-color);
+}
+
+.retry-btn {
+  padding: 0.75rem 1.5rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 1rem;
+}
+
+.retry-btn:hover {
+  background-color: var(--secondary-color);
+}
+
+/* Spline Performance Optimizations */
+.spline-area {
+  position: relative;
+  overflow: hidden;
+}
+
+.spline-area canvas {
+  image-rendering: optimizeSpeed;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: optimize-contrast;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+/* Spline Placeholder */
+.spline-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: var(--dark-color);
+  text-align: center;
+  padding: 2rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.spline-placeholder:hover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 100%);
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.7;
+}
+
+.spline-placeholder p {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--dark-color);
+}
+
+.spline-placeholder small {
+  font-size: 0.9rem;
+  color: var(--gray-color);
+  opacity: 0.8;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .spline-area canvas {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -34,19 +34,19 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// OneDrive uploads folder path
-const oneDriveUploadsPath = "C:\\Users\\rkulkarni\\OneDrive - Tumas Group Management Co\\IT Department - Documents\\notebook list 2024 - 2025\\uploads";
+// Uploads folder path - using local directory instead of hardcoded OneDrive path
+const uploadsPath = path.join(__dirname, "uploads");
 
-// Ensure OneDrive uploads folder exists
-if (!fs.existsSync(oneDriveUploadsPath)) {
-  fs.mkdirSync(oneDriveUploadsPath, { recursive: true });
-  console.log(`Created OneDrive uploads folder: ${oneDriveUploadsPath}`);
+// Ensure uploads folder exists
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+  console.log(`Created uploads folder: ${uploadsPath}`);
 }
 
-// Multer setup for OneDrive uploads
+// Multer setup for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, oneDriveUploadsPath);
+    cb(null, uploadsPath);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -70,10 +70,10 @@ app.post("/responses", upload.single("file"), async (req, res) => {
     return res.status(400).send("Invalid JSON format for responses.");
   }
 
-  const filePath = file ? path.join(oneDriveUploadsPath, file.filename) : null;
+  const filePath = file ? path.join(uploadsPath, file.filename) : null;
 
   if (file) {
-    console.log(`File uploaded to OneDrive: ${file.filename}`);
+    console.log(`File uploaded: ${file.filename}`);
     console.log(`Full path: ${filePath}`);
   }
 
@@ -116,7 +116,7 @@ app.get("/", (req, res) => {
 
 app.get("/download/:fileName", (req, res) => {
   const fileName = req.params.fileName;
-  const filePath = path.join(oneDriveUploadsPath, fileName);
+  const filePath = path.join(uploadsPath, fileName);
 
   if (fs.existsSync(filePath)) {
     res.download(filePath, fileName, (err) => {
@@ -144,5 +144,5 @@ app.get("/responses", (req, res) => {
 const PORT = 5600;
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Files will be saved to: ${oneDriveUploadsPath}`);
+  console.log(`Files will be saved to: ${uploadsPath}`);
 });
